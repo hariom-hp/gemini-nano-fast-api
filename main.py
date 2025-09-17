@@ -42,7 +42,12 @@ async def edit_image_endpoint(
         image_bytes = await file.read()
         logger.info(f"Received image: {file.filename}, size: {len(image_bytes)} bytes")
         
-        result = edit_image(image_bytes, prompt)
+        # Ensure image_bytes is of type bytes
+        if isinstance(image_bytes, str):
+            image_bytes = image_bytes.encode()
+        if isinstance(image_bytes, str):
+            image_bytes = image_bytes.encode()
+        result = edit_image(image_bytes1=image_bytes, prompt=prompt)
 
         if result is None:
             logger.error("edit_image function returned None.")
@@ -120,8 +125,13 @@ async def design_generate_endpoint(request: Request):
                 prompt = str(prompt_text)
                 logger.info(f"Prompt: {prompt}")
                 
+                # Ensure image_bytes is bytes
+                if isinstance(image_bytes, str):
+                    image_bytes = image_bytes.encode()
+                elif not isinstance(image_bytes, bytes):
+                    raise HTTPException(status_code=400, detail="Uploaded image is not in bytes format")
                 # Process the image
-                result = edit_image(image_bytes, prompt)
+                result = edit_image(image_bytes1=image_bytes, prompt=prompt)
                 
                 if result is None:
                     logger.error("edit_image function returned None.")
