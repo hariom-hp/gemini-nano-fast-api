@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, Form, HTTPException, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from services import edit_image
+from services import edit_image, edit_multiple_images
 import io
 import logging
 
@@ -42,7 +42,12 @@ async def edit_image_endpoint(
         image_bytes = await file.read()
         logger.info(f"Received image: {file.filename}, size: {len(image_bytes)} bytes")
         
-        result = edit_image(image_bytes, prompt)
+        # Ensure image_bytes is of type bytes
+        if isinstance(image_bytes, str):
+            image_bytes = image_bytes.encode()
+        if isinstance(image_bytes, str):
+            image_bytes = image_bytes.encode()
+        result = edit_image(image_bytes1=image_bytes, prompt=prompt)
 
         if result is None:
             logger.error("edit_image function returned None.")
@@ -56,6 +61,50 @@ async def edit_image_endpoint(
 
     except Exception as e:
         logger.exception("Error in /edit-image endpoint:")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/edit-multiple-images")
+async def edit_multiple_images_endpoint(
+    files: list[UploadFile],
+    prompt: str = Form(...)
+):
+    """
+    Upload multiple images + text prompt → get back modified image.
+    Example: Send a girl photo and a t-shirt photo with prompt "Make the girl wear this t-shirt"
+    """
+    try:
+        if not files or len(files) == 0:
+            raise HTTPException(status_code=400, detail="No images provided")
+        
+        logger.info(f"Received {len(files)} images with prompt: {prompt}")
+        
+        # Read all image files
+        images_bytes = []
+        for file in files:
+            image_bytes = await file.read()
+            logger.info(f"Received image: {file.filename}, size: {len(image_bytes)} bytes")
+            
+            # Ensure image_bytes is of type bytes
+            if isinstance(image_bytes, str):
+                image_bytes = image_bytes.encode()
+            
+            images_bytes.append(image_bytes)
+        
+        # Call the new service function with multiple images
+        result = edit_multiple_images(images_bytes=images_bytes, prompt=prompt)
+
+        if result is None:
+            logger.error("edit_multiple_images function returned None.")
+            raise HTTPException(status_code=500, detail="AI did not return an image")
+
+        logger.info("Returning streaming response with the edited image.")
+        return StreamingResponse(
+            io.BytesIO(result),
+            media_type="image/png"
+        )
+
+    except Exception as e:
+        logger.exception("Error in /edit-multiple-images endpoint:")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/design/generate")
@@ -120,8 +169,13 @@ async def design_generate_endpoint(request: Request):
                 prompt = str(prompt_text)
                 logger.info(f"Prompt: {prompt}")
                 
+                # Ensure image_bytes is bytes
+                if isinstance(image_bytes, str):
+                    image_bytes = image_bytes.encode()
+                elif not isinstance(image_bytes, bytes):
+                    raise HTTPException(status_code=400, detail="Uploaded image is not in bytes format")
                 # Process the image
-                result = edit_image(image_bytes, prompt)
+                result = edit_image(image_bytes1=image_bytes, prompt=prompt)
                 
                 if result is None:
                     logger.error("edit_image function returned None.")
